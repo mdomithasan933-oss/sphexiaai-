@@ -169,6 +169,41 @@ export async function fetchRankedProducts(params: RankParams) {
 }
 
 /**
+ * AI recommendation fetcher using Supabase RPC
+ */
+export async function fetchAiRecommendations({
+  budget,
+  priority,
+  trust = "all",
+}: {
+  budget: number;
+  priority: string;
+  trust?: string;
+}) {
+  const { data, error } = await supabase.rpc("get_ai_recommendations", {
+    p_budget: budget,
+    p_priority: priority,
+    p_trust: trust,
+  });
+
+  if (error) {
+    console.error("AI recommendations RPC failed:", error);
+    throw error;
+  }
+
+  const mapped = (data ?? []).map((row: AnyRow) => mapProductFromDB(row));
+  const slugs = mapped.map((p: any) => p.slug);
+  const issuesMap = await fetchPhoneIssues(slugs);
+
+  const enriched = mapped.map((p: any) => ({
+    ...p,
+    issues: issuesMap[p.slug] ?? [],
+  }));
+
+  return enriched;
+}
+
+/**
  * Product detail fetcher
  */
 export async function fetchProductBySlug(slug: string) {
@@ -197,4 +232,3 @@ export async function fetchProductBySlug(slug: string) {
     ...mapped,
     issues: issuesMap[mapped.slug] ?? [],
   };
-}
